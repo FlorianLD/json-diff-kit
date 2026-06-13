@@ -1,6 +1,5 @@
 import commonjs from '@rollup/plugin-commonjs';
 import html from '@rollup/plugin-html';
-import less from 'rollup-plugin-less';
 import livereload from 'rollup-plugin-livereload';
 import replace from '@rollup/plugin-replace';
 import resolve from '@rollup/plugin-node-resolve';
@@ -8,16 +7,12 @@ import serve from 'rollup-plugin-serve';
 import styles from 'rollup-plugin-styles';
 import swc from '@rollup/plugin-swc';
 
-import packageJson from './package.json' assert { type: 'json' };
+import packageJson from './package.json' with { type: 'json' };
 
 const BASEDIR = process.env.BASEDIR || '.cache';
 
 const plugins = [
-  less({
-    output: `${BASEDIR}/index.css`,
-    insert: true,
-  }),
-  styles(),
+  styles({ mode: ['extract', 'index.css'] }),
   html({
     template: options => {
       return `<!DOCTYPE html>
@@ -32,7 +27,7 @@ const plugins = [
     gtag('js', new Date());
     gtag('config', 'G-5D3V5T84WY');
   </script>
-  <link rel="stylesheet" href="index.css" />
+  ${(options?.files.css ?? []).map(({ fileName }) => `<link rel="stylesheet" href="${fileName}" />`).join('')}
 </head>
 <body>
   <div id="root"></div>
