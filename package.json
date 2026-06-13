@@ -35,7 +35,7 @@
     "lint:stylelint": "stylelint '**/*.{css,less}' --fix",
     "test": "cross-env jest --coverage",
     "build": "cross-env pnpm build:ts && pnpm build:less && pnpm build:typings",
-    "build:ts": "cross-env rollup -c && rollup -c rollup.config.cli.mjs",
+    "build:ts": "cross-env rollup -c -w && rollup -c rollup.config.cli.mjs",
     "build:typings": "cross-env tsc -p tsconfig.build.json",
     "build:less": "cross-env lessc src/viewer.less dist/viewer.css && lessc src/viewer-monokai.less dist/viewer-monokai.css",
     "build:pages": "cross-env NODE_ENV=production BASEDIR=docs rollup -c rollup.config.pages.mjs",

@@ -2,6 +2,8 @@ import * as React from 'react';
 
 import type { DiffResult } from './differ';
 
+import alternateDiffBlocks from './utils/alternate-diff-blocks';
+import type { AlternateDiffBlocksOptions } from './utils/alternate-diff-blocks';
 import calculatePlaceholderHeight from './utils/calculate-placeholder-height';
 import findVisibleLines from './utils/find-visible-lines';
 import getInlineDiff from './utils/get-inline-diff';
@@ -66,6 +68,16 @@ export type HideUnchangedLinesOptions = boolean | {
 export interface ViewerProps {
   /** The diff result `[before, after]`. */
   diff: readonly [DiffResult[], DiffResult[]];
+  /**
+   * Reorder a block of consecutive removed values immediately followed by a
+   * block of added values into alternating remove/add pairs, for easier
+   * positional before/after comparison. Only applies inside containers whose key
+   * is allowed (default `['actions_after']`).
+   *
+   * Default `true`. Set to `false` to disable, or pass `{ keys: [...] }` to
+   * customise which container keys are affected.
+   */
+  alternateBlocks?: boolean | AlternateDiffBlocksOptions;
   /** Configure indent, default `2` means 2 spaces. */
   indent?: number | 'tab';
   /** Background colour for 3 types of lines. */
@@ -138,7 +150,17 @@ const DEFAULT_TEXTS = {
 };
 
 const Viewer: React.FC<ViewerProps> = props => {
-  const [linesLeft, linesRight] = props.diff;
+  const { alternateBlocks = true } = props;
+  const diff = React.useMemo(() => {
+    if (alternateBlocks === false) {
+      return props.diff;
+    }
+    return alternateDiffBlocks(
+      props.diff,
+      alternateBlocks === true ? undefined : alternateBlocks,
+    );
+  }, [props.diff, alternateBlocks]);
+  const [linesLeft, linesRight] = diff;
   const jsonsAreEqual = React.useMemo(() => {
     return (
       linesLeft.length === linesRight.length &&

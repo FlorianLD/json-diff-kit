@@ -1,5 +1,6 @@
 import Differ from './differ';
 import Viewer from './viewer';
+import alternateDiffBlocks from './utils/alternate-diff-blocks';
 
 export type {
   InlineDiffOptions,
@@ -16,4 +17,8 @@ export type {
   ViewerProps,
 } from './viewer';
 
-export { Differ, Viewer };
+export type {
+  AlternateDiffBlocksOptions,
+} from './utils/alternate-diff-blocks';
+
+export { Differ, Viewer, alternateDiffBlocks };
