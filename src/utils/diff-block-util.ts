@@ -10,6 +10,13 @@ export interface AlternateDiffBlocksOptions {
    * `['actions_after', 'actions_after_creation']`.
    */
   keys?: string[];
+  /**
+   * Optional per-line text normalizer applied before computing each block's
+   * content signature. Useful when callers wrap keys with a stable but
+   * position-specific prefix (e.g. `"0001_send_alert"`) that should be ignored
+   * when deciding whether two blocks hold the same value.
+   */
+  normalizeText?: (text: string) => string;
 }
 
 /**
@@ -116,15 +123,20 @@ export const enclosingContainerKey = (
  * A stable signature of an element group, used to tell whether two groups hold
  * the same value. Level + text captures both structure and content; the differ
  * stores the trailing comma separately, so position never affects the key.
+ * If `normalizeText` is provided, each line's text is run through it before
+ * being folded into the key — useful for stripping a caller-applied
+ * position-specific prefix.
  */
 export const groupContentKey = (
   lines: DiffResult[],
   start: number,
   end: number,
+  normalizeText?: (text: string) => string,
 ): string => {
   let key = '';
   for (let i = start; i < end; i++) {
-    key += `${lines[i].level}:${lines[i].text}\n`;
+    const text = normalizeText ? normalizeText(lines[i].text) : lines[i].text;
+    key += `${lines[i].level}:${text}\n`;
   }
   return key;
 };

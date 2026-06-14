@@ -34,6 +34,7 @@ const collectGroups = (
   content: DiffResult[],
   isRow: (l: DiffResult, r: DiffResult) => boolean,
   keys: Set<string>,
+  normalizeText?: (text: string) => string,
 ): ElementGroup[] => {
   const groups: ElementGroup[] = [];
   const n = left.length;
@@ -50,7 +51,7 @@ const collectGroups = (
     for (const [s, e] of splitIntoGroups(content, i, end)) {
       const container = enclosingContainer(left, s, content[s].level);
       if (container && keys.has(container.key)) {
-        groups.push({ container: container.index, key: groupContentKey(content, s, e), start: s, end: e });
+        groups.push({ container: container.index, key: groupContentKey(content, s, e, normalizeText), start: s, end: e });
       }
     }
     i = end;
@@ -81,15 +82,16 @@ const markMovedBlocks = (
   options: AlternateDiffBlocksOptions = {},
 ): [DiffResult[], DiffResult[]] => {
   const keys = new Set(options.keys ?? DEFAULT_ALTERNATE_KEYS);
+  const { normalizeText } = options;
   const [left, right] = diff;
 
   // The container/opener structure lives on the left array (unchanged lines have
   // text on both sides). Removes carry their text on the left, adds on the right.
-  const removes = collectGroups(left, right, left, isRemoveRow, keys);
-  const adds = collectGroups(left, right, right, isAddRow, keys);
+  const removes = collectGroups(left, right, left, isRemoveRow, keys, normalizeText);
+  const adds = collectGroups(left, right, right, isAddRow, keys, normalizeText);
 
-  // Index added groups by `container + content`, queued so duplicate identical
-  // elements pair up one-to-one.
+  // Index added groups by `container + content`. Duplicate identical elements
+  // share a bucket and are picked off by positional proximity below.
   const addsByKey = new Map<string, ElementGroup[]>();
   for (const group of adds) {
     const k = `${group.container}\0${group.key}`;
@@ -110,7 +112,21 @@ const markMovedBlocks = (
     if (!bucket || !bucket.length) {
       continue;
     }
-    const add = bucket.shift()!;
+    // Content-hash tiebreaker: of all candidate adds with the same content key,
+    // pick the one whose start line is closest to this remove's start line.
+    // This produces stable, intuitive pairings when multiple identical blocks
+    // are present (FIFO would arbitrarily pair the first-seen pair regardless
+    // of distance).
+    let bestIdx = 0;
+    let bestDistance = Math.abs(bucket[0].start - rem.start);
+    for (let i = 1; i < bucket.length; i++) {
+      const d = Math.abs(bucket[i].start - rem.start);
+      if (d < bestDistance) {
+        bestDistance = d;
+        bestIdx = i;
+      }
+    }
+    const [add] = bucket.splice(bestIdx, 1);
     for (let p = rem.start; p < rem.end; p++) {
       newLeft[p] = { ...newLeft[p], moved: true };
     }
