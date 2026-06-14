@@ -165,6 +165,12 @@ export interface DiffResult {
   text: string;
   comma?: boolean;
   lineNumber?: number;
+  /**
+   * Set by `markMovedBlocks`: the line belongs to an element that exists in both
+   * sides of an `actions_after`-like container but at a different position (i.e.
+   * relocated, not changed). Viewers may highlight these specially.
+   */
+  moved?: boolean;
 }
 
 export type ArrayDiffFunc = (

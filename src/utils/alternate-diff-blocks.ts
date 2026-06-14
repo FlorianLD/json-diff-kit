@@ -1,104 +1,15 @@
 import type { DiffResult } from '../differ';
+import {
+  DEFAULT_ALTERNATE_KEYS,
+  enclosingContainerKey,
+  isAddRow,
+  isRemoveRow,
+  splitIntoGroups,
+  type AlternateDiffBlocksOptions,
+} from './diff-block-util';
 
-/**
- * The net change of the bracket depth of a single line, ignoring any brackets
- * that appear inside string literals (so `"a{b"` does not count).
- */
-const netBracketDepth = (text: string): number => {
-  let depth = 0;
-  let inString = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (ch === '\\') {
-        i++;
-      } else if (ch === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (ch === '"') {
-      inString = true;
-    } else if (ch === '{' || ch === '[') {
-      depth++;
-    } else if (ch === '}' || ch === ']') {
-      depth--;
-    }
-  }
-  return depth;
-};
-
-/**
- * Split a `[start, end)` range of `lines` into element groups. Each group is a
- * single value of the surrounding array/object: a primitive is one line, while
- * an object/array spans from its opening bracket to the matching closing one.
- */
-const splitIntoGroups = (
-  lines: DiffResult[],
-  start: number,
-  end: number,
-): Array<[number, number]> => {
-  const groups: Array<[number, number]> = [];
-  let depth = 0;
-  let groupStart = start;
-  for (let i = start; i < end; i++) {
-    depth += netBracketDepth(lines[i].text);
-    if (depth <= 0) {
-      groups.push([groupStart, i + 1]);
-      groupStart = i + 1;
-      depth = 0;
-    }
-  }
-  if (groupStart < end) {
-    groups.push([groupStart, end]);
-  }
-  return groups;
-};
-
-const isRemoveRow = (left: DiffResult, right: DiffResult): boolean =>
-  left.type === 'remove' && right.type === 'equal' && !right.text;
-
-const isAddRow = (left: DiffResult, right: DiffResult): boolean =>
-  right.type === 'add' && left.type === 'equal' && !left.text;
-
-/**
- * Matches a container-opening line such as `"actions_after": [` or
- * `"actions_after": {` and captures the (unescaped) key name. Both array and
- * object containers are supported, since `actions_after` may be a list of
- * actions or an object keyed by action name.
- */
-const CONTAINER_OPEN_RE = /^"((?:[^"\\]|\\.)*)"\s*:\s*[[{]$/;
-
-/**
- * Returns the key of the array/object that directly contains the element block
- * starting at `blockStart`, or `null` if it cannot be determined. The container
- * is opened by the nearest preceding line one level shallower than the block.
- */
-const enclosingContainerKey = (
-  lines: DiffResult[],
-  blockStart: number,
-  elementLevel: number,
-): string | null => {
-  for (let j = blockStart - 1; j >= 0; j--) {
-    if (lines[j].level === elementLevel - 1) {
-      const match = CONTAINER_OPEN_RE.exec(lines[j].text);
-      return match ? match[1] : null;
-    }
-  }
-  return null;
-};
-
-/** Container keys whose remove/add blocks are interleaved by default. */
-export const DEFAULT_ALTERNATE_KEYS = ['actions_after', 'actions_after_creation'];
-
-export interface AlternateDiffBlocksOptions {
-  /**
-   * Only interleave remove/add blocks that are direct elements of a container
-   * (array or object) whose key is in this list. Defaults to
-   * `['actions_after', 'actions_after_creation']`.
-   */
-  keys?: string[];
-}
+export { DEFAULT_ALTERNATE_KEYS };
+export type { AlternateDiffBlocksOptions };
 
 /**
  * Reorders an aligned diff result (the tuple returned by `Differ.diff`) so that

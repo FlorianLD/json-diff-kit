@@ -3,6 +3,7 @@ import * as React from 'react';
 import type { DiffResult } from './differ';
 
 import alternateDiffBlocks from './utils/alternate-diff-blocks';
+import markMovedBlocks from './utils/mark-moved-blocks';
 import type { AlternateDiffBlocksOptions } from './utils/alternate-diff-blocks';
 import calculatePlaceholderHeight from './utils/calculate-placeholder-height';
 import findVisibleLines from './utils/find-visible-lines';
@@ -78,13 +79,23 @@ export interface ViewerProps {
    * customise which container keys are affected.
    */
   alternateBlocks?: boolean | AlternateDiffBlocksOptions;
+  /**
+   * Highlight elements that exist on both sides of an `actions_after`-like
+   * container but at a different position (relocated, not changed) with a
+   * distinct colour, instead of showing them as a plain remove + add.
+   *
+   * Default `true`. Set to `false` to disable, or pass `{ keys: [...] }` to
+   * customise which container keys are affected.
+   */
+  highlightMoved?: boolean | AlternateDiffBlocksOptions;
   /** Configure indent, default `2` means 2 spaces. */
   indent?: number | 'tab';
-  /** Background colour for 3 types of lines. */
+  /** Background colour for the changed line types. */
   bgColour?: {
     add?: string;
     remove?: string;
     modify?: string;
+    moved?: string;
   };
   /** Display line numbers, default is `false`. */
   lineNumbers?: boolean;
@@ -150,16 +161,19 @@ const DEFAULT_TEXTS = {
 };
 
 const Viewer: React.FC<ViewerProps> = props => {
-  const { alternateBlocks = true } = props;
+  const { alternateBlocks = true, highlightMoved = true } = props;
   const diff = React.useMemo(() => {
-    if (alternateBlocks === false) {
-      return props.diff;
+    let result = props.diff;
+    // Mark moved elements first, so the `moved` flag rides along when the rows
+    // are reordered by the alternating pass.
+    if (highlightMoved !== false) {
+      result = markMovedBlocks(result, highlightMoved === true ? undefined : highlightMoved);
     }
-    return alternateDiffBlocks(
-      props.diff,
-      alternateBlocks === true ? undefined : alternateBlocks,
-    );
-  }, [props.diff, alternateBlocks]);
+    if (alternateBlocks !== false) {
+      result = alternateDiffBlocks(result, alternateBlocks === true ? undefined : alternateBlocks);
+    }
+    return result;
+  }, [props.diff, alternateBlocks, highlightMoved]);
   const [linesLeft, linesRight] = diff;
   const jsonsAreEqual = React.useMemo(() => {
     return (
@@ -341,8 +355,14 @@ const Viewer: React.FC<ViewerProps> = props => {
     const lResult = mergeSegments(lTokens, lDiff);
     const rResult = mergeSegments(rTokens, rDiff);
 
-    const bgLeft = l.type !== 'equal' ? props.bgColour?.[l.type] ?? '' : '';
-    const bgRight = r.type !== 'equal' ? props.bgColour?.[r.type] ?? '' : '';
+    const classLeft = `line-${l.type}${l.moved ? ' line-moved' : ''}`;
+    const classRight = `line-${r.type}${r.moved ? ' line-moved' : ''}`;
+    const bgLeft = l.moved
+      ? props.bgColour?.moved ?? ''
+      : l.type !== 'equal' ? props.bgColour?.[l.type] ?? '' : '';
+    const bgRight = r.moved
+      ? props.bgColour?.moved ?? ''
+      : r.type !== 'equal' ? props.bgColour?.[r.type] ?? '' : '';
 
     return (
       // eslint-disable-next-line react/no-array-index-key
@@ -350,14 +370,14 @@ const Viewer: React.FC<ViewerProps> = props => {
         {
           props.lineNumbers && (
             <td
-              className={`line-${l.type} line-number`}
+              className={`${classLeft} line-number`}
               style={{ backgroundColor: bgLeft }}
             >
               {l.lineNumber}
             </td>
           )
         }
-        <td className={`line-${l.type}`} style={{ backgroundColor: bgLeft }}>
+        <td className={classLeft} style={{ backgroundColor: bgLeft }}>
           <pre>
             {l.text && indentChar.repeat(l.level * indentSize)}
             {renderInlineResult(l.text, lResult, l.comma, syntaxHighlightEnabled)}
@@ -366,14 +386,14 @@ const Viewer: React.FC<ViewerProps> = props => {
         {
           props.lineNumbers && (
             <td
-              className={`line-${r.type} line-number`}
+              className={`${classRight} line-number`}
               style={{ backgroundColor: bgRight }}
             >
               {r.lineNumber}
             </td>
           )
         }
-        <td className={`line-${r.type}`} style={{ backgroundColor: bgRight }}>
+        <td className={classRight} style={{ backgroundColor: bgRight }}>
           <pre>
             {r.text && indentChar.repeat(r.level * indentSize)}
             {renderInlineResult(r.text, rResult, r.comma, syntaxHighlightEnabled)}

@@ -19,6 +19,12 @@
       background: #ffe082;
     }
 
+    // Declared after add/remove/modify so it wins for a line that is both
+    // (e.g. `line-remove line-moved`).
+    .line-moved {
+      background: #ce93d8;
+    }
+
     &:hover td {
       position: relative;
 
